@@ -6,8 +6,10 @@ library(readr)
 library(wPerm)
 library(data.table)
 library(parallel)
-
-
+library(doParallel)
+no_cores<-detectCores(logical=TRUE)
+cl<-makeCluster(no_cores-1)
+registerDoParallel(cl)
 
 getAllDrugs<-function(){
     cellLines<-readxl::read_xlsx("GDSC2_fitted_dose_response_25Feb20.xlsx") #Read cell line file
@@ -24,36 +26,43 @@ getAllDrugs<-function(){
 }
 
 drugCorTest<-function(geneFile, cellFile, drug){ #For single drug
+    #cellFile<-cellLines
     name<-drug  #Get name of drug (for future use and file naming)
     selectLines<-cellFile %>%  #Get cell lines treated with that drug
         filter(DRUG_NAME == name)
-    raw<-mclapply(genesList, getCorr, geneFile=geneExpression, selectLines=selectLines, mc.cores=7) #Apply getCorr to all genes
+    #raw<-mclapply(genesList, getCorr, geneFile=geneExpression, selectLines=selectLines, mc.cores=7) #Apply getCorr to all genes
+    raw2<-lapply(genesList, getCorr, geneFile=geneExpression, selectLines=selectLines) #Apply getCorr to all genes
     cleanup(name, raw)
 }
 
 getCorr<-function(geneFile, selectLines, geneName){ #Get correlation between the given cell lines and all genes
+    #geneName<-genesList[1]
+    #geneFile<-geneExpression
+    
     selectGenes<-geneFile %>%  #Get all genes of one name
         filter(GENE_NAME== geneName)
     merged<-left_join(selectLines,selectGenes, by=c("CELL_LINE_NAME"="SAMPLE_NAME"))  #Merge the cell line and gene files
     merged<-na.omit(merged)  #Remove all NA values (Cell lines without the given gene)
-    x<-merged$LN_IC50 $#Set x as the IC50 values
+    x<-merged$LN_IC50 #Set x as the IC50 values
     y<-merged$Z_SCORE  #Set y as the z score expression values
     cor.test(x,y, method="spearman")  #Do correlation test
 }
 cleanup<- function(name, finalList){
-    corrDF<-data.frame(matrix(unlist(finalList), nrow=16224, byrow=T))  
+    finalList<-raw2
+    corrDF<-data.frame(matrix(unlist(finalList), nrow=length(finalList), byrow=T))  
     corrDF<-corrDF[,2:3]
     final<-cbind(genes, corrDF)
     names(final)<- c("Gene_Name", "P-Value", "Correlation")
-    
-    final$Correlation<-as.numeric(levels(final$Correlation))[final$Correlation]
-    final$`P-Value`<-as.numeric(levels(final$`P-Value`))[final$`P-Value`]
+    final$Correlation<-as.numeric(final$Correlation)
+    final$`P-Value`<-as.numeric(final$`P-Value`)
+    #final$Correlation<-as.numeric(levels(final$Correlation))[final$Correlation]
+    #final$`P-Value`<-as.numeric(levels(final$`P-Value`))[final$`P-Value`]
     
     absCorr<-abs(final$Correlation)
     final<-cbind(final,absCorr)
     adjPValue<-p.adjust(final$`P-Value`, method="BH")
     final<-cbind(final, adjPValue)
-    fwrite(final, file=name+" Correlation.csv")
+    fwrite(final, file="Cytarabine Correlation.csv")
 }
 
 getAllDrugs()

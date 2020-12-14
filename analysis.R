@@ -14,6 +14,7 @@ geneExpression<-read_tsv("CosmicCLP_CompleteGeneExpression.tsv")
 geneExpression<-geneExpression%>%
     select(-"SAMPLE_ID", -"REGULATION")
 
+allDrugs<-getAllDrugs()
 
 getAllDrugs<-function(){
     cellLines<-readxl::read_xlsx("GDSC2_fitted_dose_response_25Feb20.xlsx")
