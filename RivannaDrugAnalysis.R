@@ -7,9 +7,7 @@ library(wPerm)
 library(data.table)
 library(parallel)
 library(doParallel)
-no_cores<-detectCores(logical=TRUE)
-cl<-makeCluster(no_cores-1)
-registerDoParallel(cl)
+
 
 getAllDrugs<-function(){
     cellLines<-readxl::read_xlsx("GDSC2_fitted_dose_response_25Feb20.xlsx") #Read cell line file
@@ -26,11 +24,11 @@ getAllDrugs<-function(){
 }
 
 drugCorTest<-function(geneFile, cellFile, drug){ #For single drug
-    #cellFile<-cellLines
+    cellFile<-cellLines
+    name<-"Camptothecin"
     name<-drug  #Get name of drug (for future use and file naming)
     selectLines<-cellFile %>%  #Get cell lines treated with that drug
         filter(DRUG_NAME == name)
-    #raw<-mclapply(genesList, getCorr, geneFile=geneExpression, selectLines=selectLines, mc.cores=7) #Apply getCorr to all genes
     raw2<-lapply(genesList, getCorr, geneFile=geneExpression, selectLines=selectLines) #Apply getCorr to all genes
     cleanup(name, raw)
 }
@@ -62,7 +60,7 @@ cleanup<- function(name, finalList){
     final<-cbind(final,absCorr)
     adjPValue<-p.adjust(final$`P-Value`, method="BH")
     final<-cbind(final, adjPValue)
-    fwrite(final, file="Cytarabine Correlation.csv")
+    fwrite(final, file="Camptothecin Correlation.csv")
 }
 
-getAllDrugs()
+drugCorTest(geneExpression, cellLines, "Camptothecin")
